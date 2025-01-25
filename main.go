@@ -1,8 +1,5 @@
 package main
 
-// A simple program demonstrating the text area component from the Bubbles
-// component library.
-
 import (
 	"fmt"
 	"log"
@@ -17,25 +14,21 @@ import (
 
 const gap = "\n\n"
 
-func main() {
-	p := tea.NewProgram(initialModel())
-
-	if _, err := p.Run(); err != nil {
-		log.Fatal(err)
-	}
-}
-
+// Define styles for the Titan response messages
 var titanStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#0097b2")).Bold(true) // Blue color
 
+// Define custom error message type
 type (
 	errMsg error
 )
 
+// Define a message type for the response from the Titan model
 type responseMsg struct {
 	response string
 	err      error
 }
 
+// Define the model for the Bubble Tea program
 type model struct {
 	viewport    viewport.Model
 	messages    []string
@@ -45,6 +38,7 @@ type model struct {
 	err         error
 }
 
+// Initialize the model with default values
 func initialModel() model {
 	ta := textarea.New()
 	ta.Placeholder = "Send a message..."
@@ -77,10 +71,12 @@ Enter a prompt and press Enter to send.`)
 	}
 }
 
+// Initialize the program
 func (m model) Init() tea.Cmd {
 	return textarea.Blink
 }
 
+// Command to process the output from the Titan model
 func processOutputCmd(userMessage string) tea.Cmd {
 	return func() tea.Msg {
 		response, err := titan.ProcessOutput(userMessage)
@@ -88,17 +84,20 @@ func processOutputCmd(userMessage string) tea.Cmd {
 	}
 }
 
+// Update the model based on incoming messages
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
 		tiCmd tea.Cmd
 		vpCmd tea.Cmd
 	)
 
+	// Update the textarea and viewport based on the message
 	m.textarea, tiCmd = m.textarea.Update(msg)
 	m.viewport, vpCmd = m.viewport.Update(msg)
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		// Adjust the viewport and textarea sizes based on the window size
 		m.viewport.Width = msg.Width
 		m.textarea.SetWidth(msg.Width)
 		m.viewport.Height = msg.Height - m.textarea.Height() - lipgloss.Height(gap)
@@ -111,6 +110,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
+			// Quit the program on Ctrl+C or Esc
 			fmt.Println(m.textarea.Value())
 			return m, tea.Quit
 		case tea.KeyEnter:
@@ -123,9 +123,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.GotoBottom()
 
 			// Return the command to process the output
+			// Will always return a responseMsg (or Titan response in other words)
 			return m, processOutputCmd(userMessage)
 		}
 	case responseMsg:
+		// Handle the response from the Titan model
 		if msg.err != nil {
 			log.Fatal(msg.err)
 		}
@@ -133,7 +135,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.SetContent(lipgloss.NewStyle().Width(m.viewport.Width).Render(strings.Join(m.messages, "\n")))
 		m.viewport.GotoBottom()
 
-	// We handle errors just like any other message
+	// Handle errors just like any other message
 	case errMsg:
 		m.err = msg
 		return m, nil
@@ -142,6 +144,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(tiCmd, vpCmd)
 }
 
+// View for our model
 func (m model) View() string {
 	return fmt.Sprintf(
 		"%s%s%s",
@@ -149,4 +152,13 @@ func (m model) View() string {
 		gap,
 		m.textarea.View(),
 	)
+}
+
+func main() {
+	// Initialize and run the Bubble Tea program
+	p := tea.NewProgram(initialModel())
+
+	if _, err := p.Run(); err != nil {
+		log.Fatal(err)
+	}
 }

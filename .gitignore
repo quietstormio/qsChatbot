@@ -1,0 +1,11 @@
+# Ignore the chat-demo.gif file
+chat-demo.gif
+
+# Ignore Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out

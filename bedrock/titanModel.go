@@ -11,16 +11,18 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
 )
 
+// InvokeModelWrapper is a wrapper that holds a reference to the Bedrock runtime client
 type InvokeModelWrapper struct {
 	BedrockRuntimeClient *bedrockruntime.Client
 }
 
-// The next two structs are just nested JSON
+// TitanTextRequest represents the request payload for invoking the Titan text generation model
 type TitanTextRequest struct {
 	InputText            string               `json:"inputText"`
 	TextGenerationConfig TextGenerationConfig `json:"textGenerationConfig"`
 }
 
+// TextGenerationConfig represents the configuration settings for text generation
 type TextGenerationConfig struct {
 	Temperature   float64  `json:"temperature"`
 	TopP          float64  `json:"topP"`
@@ -28,26 +30,24 @@ type TextGenerationConfig struct {
 	StopSequences []string `json:"stopSequences,omitempty"`
 }
 
-// The next two structs are nested JSON
+// TitanTextResponse represents the response from the Titan text generation model
 type TitanTextResponse struct {
 	InputTextTokenCount int      `json:"inputTextTokenCount"`
 	Results             []Result `json:"results"`
 }
 
+// Result represents a single result from the Titan text generation model
 type Result struct {
 	TokenCount       int    `json:"tokenCount"`
 	OutputText       string `json:"outputText"`
 	CompletionReason string `json:"completionReason"`
 }
 
+// ProcessError handles errors that occur during model invocation
 func ProcessError(err error, modelId string) {
-	errMsg := err.Error()
-	if strings.Contains(errMsg, "no such host") {
-		log.Printf(`The Bedrock service is not available in the selected region.
-                    Please double-check the service availability for your region at
-                    https://aws.amazon.com/about-aws/global-infrastructure/regional-product-services/.\n`)
-	} else if strings.Contains(errMsg, "Could not resolve the foundation model") {
-		log.Printf(`Could not resolve the foundation model from model identifier: \"%v\".
+	if strings.Contains(err.Error(), "ModelNotFoundException") {
+		log.Fatalf(`
+                    Model "%v" not found. 
                     Please verify that the requested model exists and is accessible
                     within the specified region.\n
                     `, modelId)
@@ -56,9 +56,11 @@ func ProcessError(err error, modelId string) {
 	}
 }
 
+// InvokeTitanText invokes the Titan text generation model with the given prompt
 func (wrapper InvokeModelWrapper) InvokeTitanText(ctx context.Context, prompt string) (*bedrockruntime.InvokeModelOutput, error) {
 	modelId := "amazon.titan-text-express-v1"
 
+	// Create the request payload
 	body, err := json.Marshal(TitanTextRequest{
 		InputText: prompt,
 		TextGenerationConfig: TextGenerationConfig{
@@ -72,7 +74,7 @@ func (wrapper InvokeModelWrapper) InvokeTitanText(ctx context.Context, prompt st
 		log.Fatal("failed to marshal", err)
 	}
 
-	// Invoke model passing the body and model ID
+	// Invoke the model passing the body and model ID
 	output, err := wrapper.BedrockRuntimeClient.InvokeModel(ctx, &bedrockruntime.InvokeModelInput{
 		ModelId:     aws.String(modelId),
 		ContentType: aws.String("application/json"),
@@ -86,6 +88,7 @@ func (wrapper InvokeModelWrapper) InvokeTitanText(ctx context.Context, prompt st
 	return output, nil
 }
 
+// ProcessOutput processes the output from the Titan model
 func ProcessOutput(userPrompt string) (string, error) {
 	// Load the AWS configuration
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-east-1"))
@@ -93,6 +96,7 @@ func ProcessOutput(userPrompt string) (string, error) {
 		log.Fatalf("failed to load configuration, %v", err)
 	}
 
+	// Create a new Bedrock runtime client
 	client := bedrockruntime.NewFromConfig(cfg)
 	wrapper := InvokeModelWrapper{
 		BedrockRuntimeClient: client,
@@ -101,6 +105,7 @@ func ProcessOutput(userPrompt string) (string, error) {
 	ctx := context.Background()
 	var response TitanTextResponse
 
+	// Invoke the Titan text generation model
 	output, err := wrapper.InvokeTitanText(ctx, userPrompt)
 	if err := json.Unmarshal(output.Body, &response); err != nil {
 		log.Fatal("failed to unmarshal", err)
