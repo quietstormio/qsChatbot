@@ -1,5 +1,6 @@
 # Ignore the chat-demo.gif file
 chat-demo.gif
+chat.tape
 
 # Ignore Go build artifacts
 *.exe
